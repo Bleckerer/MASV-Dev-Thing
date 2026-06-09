@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">MASV-Dev</string>
+    <string name="scan_interval_title">Scan interval (minutes)</string>
+    <string name="upload_interval_title">Upload retry interval (minutes)</string>
+    <string name="save">Save</string>
+    <string name="cancel">Cancel</string>
+    <string name="manual_upload">Manual Upload</string>
+    <string name="settings">Settings</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">Close navigation drawer</string>
+</resources>

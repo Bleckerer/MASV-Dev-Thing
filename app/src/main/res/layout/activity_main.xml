@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+             xmlns:app="http://schemas.android.com/apk/res-auto"
+             android:layout_width="match_parent"
+             android:layout_height="match_parent">
+
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:padding="24dp">
+
+        <TextView
+                android:id="@+id/statusTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="#f0f0f0"
+                android:padding="16dp"
+                android:layout_marginBottom="16dp"/>
+
+        <TextView
+                android:id="@+id/detectedCountTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Detected files: --"
+                android:textSize="14sp"/>
+
+        <TextView
+                android:id="@+id/pendingCountTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Pending uploads: --"
+                android:textSize="14sp"/>
+
+        <TextView
+                android:id="@+id/uploadStatusTextView"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="8dp"
+                android:text="Last upload: --"
+                android:textSize="14sp"
+                android:textColor="#666666"/>
+
+        <Button
+                android:id="@+id/startMonitoringButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Start Monitoring"
+                android:layout_marginTop="16dp"
+                android:layout_marginBottom="8dp"
+                android:backgroundTint="@color/design_default_color_primary"
+                android:textColor="@android:color/white"
+                android:textAllCaps="false"
+                android:textStyle="bold" />
+
+        <Button
+                android:id="@+id/selectFolderButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select Folder"
+                android:layout_marginTop="12dp" />
+
+        <Button
+                android:id="@+id/scanNowButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Manual Scan"
+                android:layout_marginTop="12dp" />
+
+        <Button
+                android:id="@+id/manualUploadButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Manual Upload"
+                android:layout_marginTop="12dp" />
+
+        <Button
+                android:id="@+id/resetHistoryButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Reset Upload History"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#FF9800" />
+
+    </LinearLayout>
+
+    <!-- Progress overlay -->
+    <androidx.cardview.widget.CardView
+            android:id="@+id/progressOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_margin="48dp"
+            android:visibility="gone"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="8dp">
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+            <TextView
+                    android:id="@+id/progressTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Uploading..."
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:layout_marginBottom="16dp"/>
+
+            <ProgressBar
+                    android:id="@+id/progressBar"
+                    style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:max="100"
+                    android:progress="0" />
+
+            <TextView
+                    android:id="@+id/progressPercent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0%"
+                    android:layout_marginTop="8dp"/>
+
+            <TextView
+                    android:id="@+id/progressDetails"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Preparing..."
+                    android:layout_marginTop="8dp"
+                    android:textSize="14sp"/>
+
+        </LinearLayout>
+
+    </androidx.cardview.widget.CardView>
+
+</FrameLayout>

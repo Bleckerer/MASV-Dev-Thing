@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              xmlns:app="http://schemas.android.com/apk/res-auto"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="vertical"
+              android:padding="24dp">
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Scan interval (minutes):"
+            android:layout_marginBottom="8dp" />
+
+    <EditText
+            android:id="@+id/scanIntervalEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:hint="15"
+            android:layout_marginBottom="16dp" />
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Upload retry interval (minutes):"
+            android:layout_marginBottom="8dp" />
+
+    <EditText
+            android:id="@+id/uploadIntervalEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="number"
+            android:hint="30"
+            android:layout_marginBottom="24dp" />
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="File extensions:"
+            android:layout_marginBottom="8dp" />
+
+    <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp">
+
+        <LinearLayout
+                android:id="@+id/extensionsContainer"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="8dp" />
+
+    </HorizontalScrollView>
+
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+        <EditText
+                android:id="@+id/newExtensionEditText"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="e.g., dat or .dat"
+                android:inputType="text" />
+
+        <Button
+                android:id="@+id/addExtensionButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Add" />
+
+    </LinearLayout>
+
+    <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Minimum 15 minutes for scan, 5 minutes for upload retry."
+            android:textSize="12sp"
+            android:textColor="#666666"
+            android:layout_marginTop="16dp" />
+
+</LinearLayout>
