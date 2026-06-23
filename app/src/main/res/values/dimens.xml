@@ -1,0 +1,19 @@
+<resources>
+    <dimen name="input_height">50dp</dimen>
+    <dimen name="input_corner_radius">8dp</dimen>
+    <dimen name="input_padding">14dp</dimen>
+    <dimen name="button_height">52dp</dimen>
+    <dimen name="button_corner_radius">8dp</dimen>
+    <dimen name="logo_width">203dp</dimen>
+    <dimen name="logo_height">38dp</dimen>
+    <dimen name="margin_top_logo">80dp</dimen>
+    <dimen name="margin_top_signin">24dp</dimen>
+    <dimen name="margin_top_input">32dp</dimen>
+    <dimen name="margin_between_inputs">12dp</dimen>
+    <dimen name="margin_top_button">32dp</dimen>
+    <dimen name="margin_top_progress">16dp</dimen>
+    <dimen name="screen_padding">24dp</dimen>
+    <dimen name="text_size_signin">15sp</dimen>
+    <dimen name="text_size_input">16sp</dimen>
+    <dimen name="text_size_button">16sp</dimen>
+</resources>

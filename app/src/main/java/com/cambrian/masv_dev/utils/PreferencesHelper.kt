@@ -89,7 +89,14 @@ class PreferencesHelper(context: Context) {
         prefs.edit().remove("session_id").remove("team_id").apply()
     }
 
-    // Proxy URL
+    // Team ID (new for direct MASV API)
+    fun saveTeamId(teamId: String) {
+        prefs.edit().putString("team_id", teamId).apply()
+    }
+
+    fun getTeamId(): String? = prefs.getString("team_id", null)
+
+    // Proxy URL (kept for compatibility, but no longer used)
     fun saveProxyUrl(url: String) {
         prefs.edit().putString("proxy_url", url).apply()
     }

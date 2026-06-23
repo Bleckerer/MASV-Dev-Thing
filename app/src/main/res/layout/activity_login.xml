@@ -1,47 +1,145 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:padding="24dp"
-              android:gravity="center">
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+                xmlns:app="http://schemas.android.com/apk/res-auto"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/background"
+                android:padding="24dp">
 
-    <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="MASV-Dev"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:layout_marginBottom="32dp"/>
-
-    <EditText
-            android:id="@+id/emailEditText"
+    <!-- Header -->
+    <RelativeLayout
+            android:id="@+id/headerLayout"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="MASV Email"
-            android:inputType="textEmailAddress"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginTop="20dp">
 
-    <EditText
-            android:id="@+id/passwordEditText"
+        <ImageView
+                android:id="@+id/logoSmall"
+                android:layout_width="120dp"
+                android:layout_height="24dp"
+                android:layout_centerInParent="true"
+                android:src="@drawable/masv_logo"
+                android:scaleType="fitCenter"
+                android:contentDescription="MASV Logo" />
+
+        <ImageButton
+                android:id="@+id/themeToggleButton"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:layout_alignParentStart="true"
+                android:layout_alignParentTop="true"
+                android:background="@android:color/transparent"
+                app:srcCompat="@drawable/ic_theme_toggle"
+                android:tint="@color/icon_tint"
+                android:contentDescription="Toggle theme" />
+    </RelativeLayout>
+
+    <!-- Login Content -->
+    <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="MASV Password"
-            android:inputType="textPassword"
-            android:layout_marginBottom="24dp"/>
+            android:layout_below="@id/headerLayout"
+            android:layout_marginTop="40dp"
+            android:orientation="vertical"
+            android:gravity="center_horizontal">
 
-    <Button
-            android:id="@+id/loginButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Login"/>
+        <TextView
+                android:id="@+id/signInText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Sign in with your MASV account"
+                android:textSize="15sp"
+                android:textColor="@color/text_secondary"
+                android:fontFamily="sans-serif"
+                android:gravity="center" />
 
-    <ProgressBar
-            android:id="@+id/progressBar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:layout_marginTop="16dp"
-            android:visibility="gone"/>
+        <!-- Email Field -->
+        <LinearLayout
+                android:id="@+id/emailField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:orientation="vertical">
 
-</LinearLayout>
+            <TextView
+                    android:id="@+id/emailLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MASV Email"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif"
+                    android:layout_marginBottom="4dp" />
+
+            <EditText
+                    android:id="@+id/emailEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/input_field_bg"
+                    android:hint="you@studio.com"
+                    android:inputType="textEmailAddress"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="16sp"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:fontFamily="sans-serif" />
+        </LinearLayout>
+
+        <!-- Password Field -->
+        <LinearLayout
+                android:id="@+id/passwordField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical">
+
+            <TextView
+                    android:id="@+id/passwordLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="MASV Password"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif"
+                    android:layout_marginBottom="4dp" />
+
+            <EditText
+                    android:id="@+id/passwordEditText"
+                    android:layout_width="match_parent"
+                    android:layout_height="50dp"
+                    android:background="@drawable/input_field_bg"
+                    android:hint="••••••••••"
+                    android:inputType="textPassword"
+                    android:textColor="@color/text_primary"
+                    android:textColorHint="@color/text_hint"
+                    android:textSize="16sp"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:fontFamily="sans-serif" />
+        </LinearLayout>
+
+        <!-- Login Button -->
+        <Button
+                android:id="@+id/loginButton"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:layout_marginTop="32dp"
+                android:text="Log in"
+                android:textSize="16sp"
+                android:textColor="@color/button_text"
+                android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:background="@drawable/btn_primary_gradient" />
+
+        <!-- Progress Bar -->
+        <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:visibility="gone" />
+
+    </LinearLayout>
+
+</RelativeLayout>

@@ -28,6 +28,9 @@ import com.cambrian.masv_dev.utils.PreferencesHelper
 import java.io.File
 import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
+import android.widget.ImageButton
+import androidx.appcompat.app.AppCompatDelegate
+import com.cambrian.masv_dev.LoginActivity
 
 class MainActivity : AppCompatActivity() {
 
@@ -86,6 +89,23 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        // Theme toggle
+        findViewById<ImageButton>(R.id.themeToggleButton).setOnClickListener {
+            val currentMode = AppCompatDelegate.getDefaultNightMode()
+            val newMode = if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
+                AppCompatDelegate.MODE_NIGHT_NO
+            } else {
+                AppCompatDelegate.MODE_NIGHT_YES
+            }
+            AppCompatDelegate.setDefaultNightMode(newMode)
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+            recreate()
+        }
+
+        findViewById<ImageButton>(R.id.settingsButton).setOnClickListener {
+            showSettingsDialog()
+        }
 
         preferencesHelper = PreferencesHelper(this)
 
@@ -337,6 +357,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
+        // Add logout item
+        menu.add("Logout").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
         return true
     }
 
@@ -346,8 +368,29 @@ class MainActivity : AppCompatActivity() {
                 showSettingsDialog()
                 true
             }
-            else -> super.onOptionsItemSelected(item)
+            else -> {
+                // Handle logout if the title matches "Logout"
+                if (item.title == "Logout") {
+                    logout()
+                    true
+                } else {
+                    super.onOptionsItemSelected(item)
+                }
+            }
         }
+    }
+
+    private fun logout() {
+        AlertDialog.Builder(this)
+            .setTitle("Logout")
+            .setMessage("Are you sure you want to logout?")
+            .setPositiveButton("Yes") { _, _ ->
+                preferencesHelper.clearSession()
+                startActivity(Intent(this, LoginActivity::class.java))
+                finish()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun addExtensionChip(container: LinearLayout, ext: String, onRemove: (String) -> Unit) {
@@ -355,6 +398,8 @@ class MainActivity : AppCompatActivity() {
             text = ext
             setPadding(32, 16, 32, 16)
             background = ContextCompat.getDrawable(this@MainActivity, R.drawable.chip_background)
+            // Set text color to white
+            setTextColor(ContextCompat.getColor(this@MainActivity, android.R.color.white))
             compoundDrawablePadding = 32
             val removeDrawable = ContextCompat.getDrawable(this@MainActivity, android.R.drawable.ic_menu_close_clear_cancel)
             removeDrawable?.setBounds(0, 0, removeDrawable.intrinsicWidth, removeDrawable.intrinsicHeight)
@@ -379,6 +424,20 @@ class MainActivity : AppCompatActivity() {
         val extensionsContainer = dialogView.findViewById<LinearLayout>(R.id.extensionsContainer)
         val newExtensionEditText = dialogView.findViewById<EditText>(R.id.newExtensionEditText)
         val addButton = dialogView.findViewById<Button>(R.id.addExtensionButton)
+        val logoutButton = dialogView.findViewById<Button>(R.id.logoutButton)
+
+        logoutButton.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("Logout")
+                .setMessage("Are you sure you want to logout?")
+                .setPositiveButton("Yes") { _, _ ->
+                    PreferencesHelper(this).clearSession()
+                    startActivity(Intent(this, LoginActivity::class.java))
+                    finish()
+                }
+                .setNegativeButton("No", null)
+                .show()
+        }
 
         fun refreshExtensionsList() {
             extensionsContainer.removeAllViews()

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary colors (adjusted for dark) -->
+    <color name="primary">#4F8EF5</color>
+    <color name="primary_dark">#1A4A8A</color>
+
+    <!-- Button colors -->
+    <color name="button_primary_start">#005DBE</color>
+    <color name="button_primary_end">#007BFF</color>
+    <color name="button_secondary_bg">#1E293B</color>        <!-- from JSON -->
+    <color name="button_secondary_text">#4F8EF5</color>      <!-- from JSON -->
+    <color name="button_destructive">#E62323</color>
+    <color name="button_destructive_text">#FB9C9C</color>    <!-- from JSON -->
+    <color name="button_text">#FFFFFF</color>
+
+    <!-- Backgrounds -->
+    <color name="background">#0F172A</color>
+    <color name="card_bg">#1E293B</color>
+
+    <!-- Text colors -->
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="text_hint">#64748B</color>
+
+    <!-- Input fields -->
+    <color name="input_bg">#1E293B</color>
+    <color name="input_border">#334155</color>
+
+    <!-- Chips -->
+    <color name="chip_bg">#6366F1</color>
+    <color name="chip_text">#FFFFFF</color>
+
+    <!-- Divider -->
+    <color name="divider">#334155</color>
+
+    <!-- Icons -->
+    <color name="icon_tint">#F3F4F6</color>
+</resources>

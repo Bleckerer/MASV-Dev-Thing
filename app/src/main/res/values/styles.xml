@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TextStyle_15sp">
+        <item name="android:textSize">15sp</item>
+        <item name="android:textColor">#FF4E4E4E</item>
+        <item name="android:fontFamily">Roboto</item>
+    </style>
+    <style name="TextStyle_16sp">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textColor">#FF9CA3AF</item>
+        <item name="android:fontFamily">Roboto</item>
+    </style>
+</resources>

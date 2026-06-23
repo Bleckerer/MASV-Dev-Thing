@@ -2,6 +2,7 @@ package com.cambrian.masv_dev
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
@@ -14,7 +15,11 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.TimeUnit
+import android.widget.ImageButton
+import androidx.appcompat.app.AppCompatDelegate
 
 class LoginActivity : AppCompatActivity() {
 
@@ -30,62 +35,55 @@ class LoginActivity : AppCompatActivity() {
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
 
+    companion object {
+        private const val TAG = "LoginActivity"
+        private const val MASV_API_BASE = "https://api.massive.app/v1"
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
+
+        // Theme toggle
+        findViewById<ImageButton>(R.id.themeToggleButton).setOnClickListener {
+            val currentMode = AppCompatDelegate.getDefaultNightMode()
+            val newMode = if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
+                AppCompatDelegate.MODE_NIGHT_NO
+            } else {
+                AppCompatDelegate.MODE_NIGHT_YES
+            }
+            AppCompatDelegate.setDefaultNightMode(newMode)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startActivity(Intent(this, MainActivity::class.java))
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+            } else {
+                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+            }
+            recreate()
+        }
+
+
 
         preferencesHelper = PreferencesHelper(this)
 
         val sessionId = preferencesHelper.getSessionId()
         if (sessionId != null) {
-            validateSession(sessionId)
+            startMainActivity()
             return
         }
 
         setupLoginUI()
     }
 
-    private fun validateSession(sessionId: String) {
-        val proxyUrl = BuildConfig.MASV_PROXY_URL
-        if (proxyUrl.isNullOrEmpty()) {
-            startLoginActivity()
-            return
-        }
-        val json = JSONObject().apply { put("sessionId", sessionId) }
-        val requestBody = json.toString().toRequestBody("application/json".toMediaType())
-        val request = Request.Builder()
-            .url("$proxyUrl/../validate")
-            .post(requestBody)
-            .build()
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val response = client.newCall(request).execute()
-                if (response.isSuccessful) {
-                    withContext(Dispatchers.Main) {
-                        startMainActivity()
-                    }
-                } else {
-                    withContext(Dispatchers.Main) {
-                        preferencesHelper.clearSession()
-                        startLoginActivity()
-                    }
-                }
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    preferencesHelper.clearSession()
-                    startLoginActivity()
-                }
-            }
-        }
-    }
-
-    private fun startLoginActivity() {
-        setupLoginUI()
+    // Generate expiry date: 24 hours from now in UTC, ISO 8601 format
+    private fun getExpiryDate(): String {
+        val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+        calendar.add(Calendar.HOUR, 24)
+        return SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+            .format(calendar.time)
     }
 
     private fun setupLoginUI() {
-        setContentView(R.layout.activity_login)
         emailEditText = findViewById(R.id.emailEditText)
         passwordEditText = findViewById(R.id.passwordEditText)
         loginButton = findViewById(R.id.loginButton)
@@ -106,49 +104,117 @@ class LoginActivity : AppCompatActivity() {
         loginButton.isEnabled = false
         progressBar.visibility = ProgressBar.VISIBLE
 
-        val proxyUrl = BuildConfig.MASV_PROXY_URL
-        if (proxyUrl.isNullOrEmpty()) {
-            Toast.makeText(this, "Proxy URL not configured", Toast.LENGTH_SHORT).show()
-            finish()
-            return
-        }
-
-        val json = JSONObject().apply {
-            put("email", email)
-            put("password", password)
-        }
-        val requestBody = json.toString().toRequestBody("application/json".toMediaType())
-        val request = Request.Builder()
-            .url("$proxyUrl/../auth")
-            .post(requestBody)
-            .build()
-
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response = client.newCall(request).execute()
-                val body = response.body?.string()
-                withContext(Dispatchers.Main) {
-                    if (response.isSuccessful && body != null) {
-                        val jsonResponse = JSONObject(body)
-                        val sessionId = jsonResponse.getString("sessionId")
-                        preferencesHelper.saveSessionId(sessionId)
-                        startMainActivity()
-                    } else {
-                        val msg = if (body != null) JSONObject(body).optString("message", "Authentication failed")
-                        else "Authentication failed"
-                        Toast.makeText(this@LoginActivity, msg, Toast.LENGTH_LONG).show()
-                        loginButton.isEnabled = true
-                        progressBar.visibility = ProgressBar.GONE
-                    }
+                // Step 1: Authenticate
+                val authJson = JSONObject().apply {
+                    put("email", email)
+                    put("password", password)
                 }
-            } catch (e: Exception) {
+                val authRequest = Request.Builder()
+                    .url("$MASV_API_BASE/auth")
+                    .addHeader("Content-Type", "application/json")
+                    .post(authJson.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val authResponse = client.newCall(authRequest).execute()
+                val authBody = authResponse.body?.string()
+                Log.d(TAG, "Auth response code: ${authResponse.code}")
+
+                if (!authResponse.isSuccessful || authBody == null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@LoginActivity,
+                            "Authentication failed: ${authResponse.code}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        resetUI()
+                    }
+                    return@launch
+                }
+
+                val authJsonResponse = JSONObject(authBody)
+                val jwt = authJsonResponse.getString("token")
+                val teamsArray = authJsonResponse.getJSONArray("teams")
+                if (teamsArray.length() == 0) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@LoginActivity,
+                            "No teams found for this account",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        resetUI()
+                    }
+                    return@launch
+                }
+                val teamId = teamsArray.getJSONObject(0).getString("id")
+                Log.d(TAG, "Team ID: $teamId")
+                preferencesHelper.saveTeamId(teamId)
+
+                // Step 2: Create API key with expiry and state
+                val expiryDate = getExpiryDate()
+                Log.d(TAG, "Expiry date: $expiryDate")
+
+                val apiKeyJson = JSONObject().apply {
+                    put("name", "Android_${System.currentTimeMillis()}")
+                    put("expiry", expiryDate)   // ✅ Correct field name (per docs)
+                    put("state", "active")      // ✅ Required field (per docs)
+                }
+                Log.d(TAG, "API key request: $apiKeyJson")
+
+                val apiKeyRequest = Request.Builder()
+                    .url("$MASV_API_BASE/teams/$teamId/api_keys")
+                    .addHeader("Content-Type", "application/json")
+                    .addHeader("X-User-Token", jwt)
+                    .post(apiKeyJson.toString().toRequestBody("application/json".toMediaType()))
+                    .build()
+
+                val apiKeyResponse = client.newCall(apiKeyRequest).execute()
+                val apiKeyBody = apiKeyResponse.body?.string()
+                Log.d(TAG, "API key response code: ${apiKeyResponse.code}")
+                Log.d(TAG, "API key response body: $apiKeyBody")
+
+                if (!apiKeyResponse.isSuccessful || apiKeyBody == null) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@LoginActivity,
+                            "Failed to create API key: ${apiKeyResponse.code}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        resetUI()
+                    }
+                    return@launch
+                }
+
+                val apiKeyJsonResponse = JSONObject(apiKeyBody)
+                val apiKey = apiKeyJsonResponse.getString("key")
+                val returnedExpiry = apiKeyJsonResponse.optString("expiry")
+                Log.d(TAG, "API key created: ${apiKey.take(20)}...")
+                Log.d(TAG, "Returned expiry from API: $returnedExpiry")
+
+                preferencesHelper.saveSessionId(apiKey)
+
                 withContext(Dispatchers.Main) {
-                    Toast.makeText(this@LoginActivity, "Network error: ${e.message}", Toast.LENGTH_LONG).show()
-                    loginButton.isEnabled = true
-                    progressBar.visibility = ProgressBar.GONE
+                    startMainActivity()
+                }
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Login error", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@LoginActivity,
+                        "Network error: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    resetUI()
                 }
             }
         }
+    }
+
+    private fun resetUI() {
+        loginButton.isEnabled = true
+        progressBar.visibility = ProgressBar.GONE
     }
 
     private fun startMainActivity() {
