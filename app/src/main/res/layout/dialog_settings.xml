@@ -110,7 +110,7 @@
             android:layout_marginTop="16dp"
             android:layout_marginBottom="16dp" />
 
-    <!-- Logout Button (destructive outline) -->
+    <!-- Logout Button (destructive outline) - RESTORED -->
     <Button
             android:id="@+id/logoutButton"
             android:layout_width="match_parent"
@@ -124,6 +124,39 @@
             android:paddingTop="0dp"
             android:paddingBottom="0dp"
             android:gravity="center"
-            android:fontFamily="sans-serif-medium" />
+            android:fontFamily="sans-serif-medium"
+            android:layout_marginBottom="16dp" />
+
+    <!-- Custom button row (replaces the framework's button panel) -->
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="end"
+            android:paddingTop="8dp">
+
+        <Button
+                android:id="@+id/cancelButton"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Cancel"
+                android:textSize="14sp"
+                android:textColor="@color/text_primary"
+                android:background="?attr/selectableItemBackground"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp" />
+
+        <Button
+                android:id="@+id/saveButton"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="Save"
+                android:textSize="14sp"
+                android:textColor="@color/text_primary"
+                android:background="?attr/selectableItemBackground"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:layout_marginStart="8dp" />
+    </LinearLayout>
 
 </LinearLayout>

@@ -1,13 +1,24 @@
 package com.cambrian.masv_dev.utils
 
 import android.content.Context
-import android.content.SharedPreferences
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 
 class PreferencesHelper(context: Context) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences("masv_dev_prefs", Context.MODE_PRIVATE)
+    private val masterKey = MasterKey.Builder(context)
+        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+        .build()
 
-    // Folder monitoring
+    private val prefs = EncryptedSharedPreferences.create(
+        context,
+        "masv_dev_prefs_encrypted",
+        masterKey,
+        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+    )
+
+    // -------------------- Folder monitoring --------------------
     fun saveMonitoredFolderUri(uri: String) {
         prefs.edit().putString("monitored_folder_uri", uri).apply()
     }
@@ -20,7 +31,7 @@ class PreferencesHelper(context: Context) {
 
     fun getMonitoredFolderPath(): String? = prefs.getString("monitored_folder_path", null)
 
-    // Uploaded files
+    // -------------------- Uploaded files --------------------
     fun saveUploadedFiles(files: Set<String>) {
         prefs.edit().putString("uploaded_files", files.joinToString(",")).apply()
     }
@@ -42,7 +53,7 @@ class PreferencesHelper(context: Context) {
         } else null
     }
 
-    // Intervals
+    // -------------------- Intervals --------------------
     fun saveScanIntervalMinutes(minutes: Int) {
         prefs.edit().putInt("scan_interval_minutes", minutes).apply()
     }
@@ -55,7 +66,7 @@ class PreferencesHelper(context: Context) {
 
     fun getUploadRetryIntervalMinutes(): Int = prefs.getInt("upload_retry_interval_minutes", 30)
 
-    // Batch storage
+    // -------------------- Batch storage --------------------
     fun saveBatch(batchId: String, uris: Set<String>, packageId: String, accessToken: String) {
         with(prefs.edit()) {
             putStringSet("batch_${batchId}_uris", uris)
@@ -78,7 +89,7 @@ class PreferencesHelper(context: Context) {
         }
     }
 
-    // Session
+    // -------------------- Session --------------------
     fun saveSessionId(sessionId: String) {
         prefs.edit().putString("session_id", sessionId).apply()
     }
@@ -89,21 +100,21 @@ class PreferencesHelper(context: Context) {
         prefs.edit().remove("session_id").remove("team_id").apply()
     }
 
-    // Team ID (new for direct MASV API)
+    // -------------------- Team ID --------------------
     fun saveTeamId(teamId: String) {
         prefs.edit().putString("team_id", teamId).apply()
     }
 
     fun getTeamId(): String? = prefs.getString("team_id", null)
 
-    // Proxy URL (kept for compatibility, but no longer used)
+    // -------------------- Proxy URL (kept for compatibility) --------------------
     fun saveProxyUrl(url: String) {
         prefs.edit().putString("proxy_url", url).apply()
     }
 
     fun getProxyUrl(): String? = prefs.getString("proxy_url", null)
 
-    // File extensions
+    // -------------------- File extensions --------------------
     fun getScanExtensions(): String {
         return prefs.getString("scan_extensions", ".png") ?: ".png"
     }
@@ -127,6 +138,14 @@ class PreferencesHelper(context: Context) {
     fun addFileExtension(ext: String) {
         val current = getScanExtensionsSet()
         var normalized = ext.trim().lowercase()
+
+        // Remove any dangerous characters (path separators, semicolon, pipes, etc.)
+        normalized = normalized.replace(Regex("[^a-z0-9.]"), "")
+
+        if (normalized.isEmpty() || normalized == ".") {
+            return
+        }
+
         if (!normalized.startsWith(".")) normalized = ".$normalized"
         current.add(normalized)
         saveScanExtensions(current.joinToString(","))
@@ -135,11 +154,14 @@ class PreferencesHelper(context: Context) {
     fun removeFileExtension(ext: String) {
         val current = getScanExtensionsSet()
         var normalized = ext.trim().lowercase()
+        normalized = normalized.replace(Regex("[^a-z0-9.]"), "")
+        if (normalized.isEmpty() || normalized == ".") return
         if (!normalized.startsWith(".")) normalized = ".$normalized"
         current.remove(normalized)
         saveScanExtensions(current.joinToString(","))
     }
 
+    // -------------------- Batch pending check --------------------
     fun hasPendingBatch(): Boolean {
         val all = prefs.all
         return all.keys.any { key ->

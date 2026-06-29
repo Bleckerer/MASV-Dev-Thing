@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">MyApp</string>
+    <string name="app_name">MASV-Dev</string>
     <string name="sign_in_with_your_masv_account">Sign in with your MASV account</string>
     <string name="masv_email">MASV Email</string>
     <string name="placeholder">••••••••••</string>

@@ -41,8 +41,8 @@ class FileMonitorWorker(
 
             val uri = Uri.parse(monitoredFolderUri)
             val root = DocumentFile.fromTreeUri(applicationContext, uri)
-            if (root == null || !root.exists()) {
-                Log.e(TAG, "Cannot access monitored folder")
+            if (root == null || !root.exists() || !root.isDirectory) {
+                Log.e(TAG, "Selected URI is not a directory or is inaccessible")
                 return@withContext Result.failure()
             }
 
@@ -51,7 +51,9 @@ class FileMonitorWorker(
             findFiles(root, alreadyUploaded, newlyFoundUris)
 
             if (newlyFoundUris.isNotEmpty()) {
-                Log.d(TAG, "Found ${newlyFoundUris.size} new file(s)")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Found ${newlyFoundUris.size} new file(s)")
+                }
                 notificationHelper.showNewFilesDetected(newlyFoundUris.size)
                 if (isNetworkAvailable()) {
                     notificationHelper.dismissWaitingForNetwork()
@@ -68,12 +70,16 @@ class FileMonitorWorker(
                             .build())
                         .build()
                     WorkManager.getInstance(applicationContext).enqueue(batchWork)
-                    Log.d(TAG, "BatchUploadWorker enqueued with batchId: $batchId")
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "BatchUploadWorker enqueued with batchId: $batchId")
+                    }
                 } else {
                     notificationHelper.showWaitingForNetwork()
                 }
             } else {
-                Log.d(TAG, "No new files found")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "No new files found")
+                }
             }
             return@withContext Result.success()
         } catch (e: Exception) {

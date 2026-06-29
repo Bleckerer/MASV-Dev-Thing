@@ -61,13 +61,14 @@ class NotificationHelper(private val context: Context) {
         manager.notify(NOTIFICATION_ID_NEW_FILES, notification)
     }
 
-    fun showUploadStarted(fileName: String) {
+    fun showUploadStarted(fileName: String, progress: Int = 0) {
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_STATUS)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle("Uploading to MASV")
-            .setContentText("Uploading: $fileName")
+            .setContentText("Uploading: $fileName ($progress%)")
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
+            .setProgress(100, progress, false)
             .build()
 
         val manager = context.getSystemService(NotificationManager::class.java)

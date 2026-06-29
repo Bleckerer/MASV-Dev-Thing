@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import android.provider.DocumentsContract
 import android.provider.Settings
 import android.util.Log
 import android.view.Menu
@@ -16,23 +15,17 @@ import android.view.View
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.documentfile.provider.DocumentFile
-import androidx.lifecycle.Observer
 import androidx.work.*
-import com.cambrian.masv_dev.utils.NotificationHelper
 import com.cambrian.masv_dev.utils.PreferencesHelper
 import java.io.File
-import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 import android.widget.ImageButton
-import androidx.appcompat.app.AppCompatDelegate
-import com.cambrian.masv_dev.LoginActivity
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : BaseActivity() {
 
     companion object {
         private const val TAG = "MASVDevMain"
@@ -74,33 +67,12 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val requestPermissionsLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { results ->
-        val allGranted = results.values.all { it }
-        if (allGranted) {
-            Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show()
-            updateButtonsEnabledState()
-        } else {
-            Toast.makeText(this, "Some permissions denied. Functionality may be limited.", Toast.LENGTH_SHORT).show()
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Theme toggle
         findViewById<ImageButton>(R.id.themeToggleButton).setOnClickListener {
-            val currentMode = AppCompatDelegate.getDefaultNightMode()
-            val newMode = if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
-                AppCompatDelegate.MODE_NIGHT_NO
-            } else {
-                AppCompatDelegate.MODE_NIGHT_YES
-            }
-            AppCompatDelegate.setDefaultNightMode(newMode)
-            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-            recreate()
+            switchThemeWithFade()
         }
 
         findViewById<ImageButton>(R.id.settingsButton).setOnClickListener {
@@ -109,10 +81,8 @@ class MainActivity : AppCompatActivity() {
 
         preferencesHelper = PreferencesHelper(this)
 
-        // Redirect to login if no session
         checkSessionAndRedirect()
 
-        // Find all views
         statusTextView = findViewById(R.id.statusTextView)
         detectedCountTextView = findViewById(R.id.detectedCountTextView)
         pendingCountTextView = findViewById(R.id.pendingCountTextView)
@@ -128,7 +98,6 @@ class MainActivity : AppCompatActivity() {
         progressPercent = findViewById(R.id.progressPercent)
         progressDetails = findViewById(R.id.progressDetails)
 
-        // Set click listeners
         selectFolderButton.setOnClickListener {
             if (checkStoragePermission()) {
                 openFolderPicker()
@@ -171,15 +140,12 @@ class MainActivity : AppCompatActivity() {
                 .show()
         }
 
-        // Update button states after all views are found
         updateButtonsEnabledState()
-
         requestNotificationPermission()
         updateStatus()
         refreshDetectedFilesCount()
         refreshPendingUploadsCount()
 
-        // Observe batch upload progress
         WorkManager.getInstance(this).getWorkInfosByTagLiveData("batch_upload").observe(this) { workInfos ->
             val activeWork = workInfos?.firstOrNull { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
             if (activeWork != null) {
@@ -187,18 +153,45 @@ class MainActivity : AppCompatActivity() {
                 val currentFile = progress.getInt("currentFile", 0)
                 val totalFiles = progress.getInt("totalFiles", 0)
                 val fileName = progress.getString("currentFileName") ?: ""
+                val bytesTransferred = progress.getLong("bytesTransferred", 0L)
+                val totalBytes = progress.getLong("totalBytes", 0L)
 
                 progressOverlay.visibility = View.VISIBLE
+
                 if (totalFiles > 0) {
                     progressTitle.text = "Uploading file $currentFile of $totalFiles"
-                    progressDetails.text = if (fileName.isNotEmpty()) "File: $fileName" else "Preparing..."
-                    progressBar.isIndeterminate = true
-                    progressPercent.visibility = View.GONE
+
+                    val detailsText = if (fileName.isNotEmpty() && totalBytes > 0) {
+                        val percent = (bytesTransferred * 100 / totalBytes).toInt()
+                        val transferredMB = bytesTransferred / (1024 * 1024)
+                        val totalMB = totalBytes / (1024 * 1024)
+                        "$fileName · $percent% · $transferredMB MB / $totalMB MB"
+                    } else if (fileName.isNotEmpty()) {
+                        "File: $fileName"
+                    } else {
+                        "Preparing..."
+                    }
+                    progressDetails.text = detailsText
+
+                    if (totalBytes > 0) {
+                        val percent = (bytesTransferred * 100 / totalBytes).toInt()
+                        progressBar.isIndeterminate = false
+                        progressBar.max = 100
+                        progressBar.progress = percent
+                        progressPercent.visibility = View.VISIBLE
+                        progressPercent.text = "$percent%"
+                    } else {
+                        progressBar.isIndeterminate = true
+                        progressPercent.visibility = View.GONE
+                    }
                 } else {
                     progressTitle.text = "Preparing upload..."
+                    progressDetails.text = ""
+                    progressBar.isIndeterminate = true
+                    progressPercent.visibility = View.GONE
                 }
             } else {
-                // No active worker, but there may be a pending batch (waiting for retry)
+                // No active worker – show a brief "Finalising" state before hiding
                 if (preferencesHelper.hasPendingBatch()) {
                     progressOverlay.visibility = View.VISIBLE
                     progressTitle.text = "Upload paused – retrying"
@@ -206,7 +199,18 @@ class MainActivity : AppCompatActivity() {
                     progressBar.isIndeterminate = true
                     progressPercent.visibility = View.GONE
                 } else {
-                    progressOverlay.visibility = View.GONE
+                    // If the overlay is visible and the worker just finished, show "Finalising" briefly
+                    if (progressOverlay.visibility == View.VISIBLE) {
+                        progressTitle.text = "Finalising package..."
+                        progressDetails.text = ""
+                        progressBar.isIndeterminate = true
+                        progressPercent.visibility = View.GONE
+                        android.os.Handler(mainLooper).postDelayed({
+                            progressOverlay.visibility = View.GONE
+                        }, 1500)
+                    } else {
+                        progressOverlay.visibility = View.GONE
+                    }
                     refreshDetectedFilesCount()
                     refreshPendingUploadsCount()
                 }
@@ -257,10 +261,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openFolderPicker() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
-            putExtra(DocumentsContract.EXTRA_INITIAL_URI,
-                Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADCIM%2FCycloneFIELD360"))
-        }
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
         folderPickerLauncher.launch(intent)
     }
 
@@ -276,7 +277,6 @@ class MainActivity : AppCompatActivity() {
         startMonitoringButton.isEnabled = folderSelected
         scanNowButton.isEnabled = folderSelected
         manualUploadButton.isEnabled = folderSelected
-        // resetHistoryButton always enabled
     }
 
     private fun refreshDetectedFilesCount() {
@@ -357,7 +357,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
-        // Add logout item
         menu.add("Logout").setShowAsAction(MenuItem.SHOW_AS_ACTION_NEVER)
         return true
     }
@@ -369,7 +368,6 @@ class MainActivity : AppCompatActivity() {
                 true
             }
             else -> {
-                // Handle logout if the title matches "Logout"
                 if (item.title == "Logout") {
                     logout()
                     true
@@ -398,7 +396,6 @@ class MainActivity : AppCompatActivity() {
             text = ext
             setPadding(32, 16, 32, 16)
             background = ContextCompat.getDrawable(this@MainActivity, R.drawable.chip_background)
-            // Set text color to white
             setTextColor(ContextCompat.getColor(this@MainActivity, android.R.color.white))
             compoundDrawablePadding = 32
             val removeDrawable = ContextCompat.getDrawable(this@MainActivity, android.R.drawable.ic_menu_close_clear_cancel)
@@ -417,6 +414,7 @@ class MainActivity : AppCompatActivity() {
         container.addView(chip)
     }
 
+    // ******************* CORRECTED showSettingsDialog *******************
     private fun showSettingsDialog() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_settings, null)
         val scanInput = dialogView.findViewById<EditText>(R.id.scanIntervalEditText)
@@ -425,6 +423,8 @@ class MainActivity : AppCompatActivity() {
         val newExtensionEditText = dialogView.findViewById<EditText>(R.id.newExtensionEditText)
         val addButton = dialogView.findViewById<Button>(R.id.addExtensionButton)
         val logoutButton = dialogView.findViewById<Button>(R.id.logoutButton)
+        val cancelButton = dialogView.findViewById<Button>(R.id.cancelButton)
+        val saveButton = dialogView.findViewById<Button>(R.id.saveButton)
 
         logoutButton.setOnClickListener {
             AlertDialog.Builder(this)
@@ -464,22 +464,39 @@ class MainActivity : AppCompatActivity() {
         scanInput.setText(preferencesHelper.getScanIntervalMinutes().toString())
         uploadInput.setText(preferencesHelper.getUploadRetryIntervalMinutes().toString())
 
-        AlertDialog.Builder(this)
-            .setTitle("Settings")
-            .setView(dialogView)
-            .setPositiveButton("Save") { _, _ ->
-                val newScan = scanInput.text.toString().toIntOrNull()
-                val newUpload = uploadInput.text.toString().toIntOrNull()
-                if (newScan != null && newScan >= 15) preferencesHelper.saveScanIntervalMinutes(newScan)
-                else Toast.makeText(this, "Scan interval must be >= 15", Toast.LENGTH_SHORT).show()
-                if (newUpload != null && newUpload >= 5) preferencesHelper.saveUploadRetryIntervalMinutes(newUpload)
-                else Toast.makeText(this, "Upload retry interval must be >= 5", Toast.LENGTH_SHORT).show()
-                restartMonitoringIfActive()
-                refreshDetectedFilesCount()
+        // Build the dialog WITHOUT the framework's buttons
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle(null)
+        builder.setView(dialogView)
+
+        val dialog = builder.show()
+
+        cancelButton.setOnClickListener {
+            dialog.dismiss()
+        }
+
+        saveButton.setOnClickListener {
+            val newScan = scanInput.text.toString().toIntOrNull()
+            val newUpload = uploadInput.text.toString().toIntOrNull()
+
+            if (newScan != null && newScan >= 15) {
+                preferencesHelper.saveScanIntervalMinutes(newScan)
+            } else {
+                Toast.makeText(this, "Scan interval must be >= 15", Toast.LENGTH_SHORT).show()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+
+            if (newUpload != null && newUpload >= 5) {
+                preferencesHelper.saveUploadRetryIntervalMinutes(newUpload)
+            } else {
+                Toast.makeText(this, "Upload retry interval must be >= 5", Toast.LENGTH_SHORT).show()
+            }
+
+            restartMonitoringIfActive()
+            refreshDetectedFilesCount()
+            dialog.dismiss()
+        }
     }
+    // ********************************************************************
 
     private fun restartMonitoringIfActive() {
         if (!startMonitoringButton.isEnabled && startMonitoringButton.text == "Monitoring Active") {

@@ -7,33 +7,24 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import com.cambrian.masv_dev.api.ApiClient
 import com.cambrian.masv_dev.utils.PreferencesHelper
 import kotlinx.coroutines.*
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.*
-import java.util.concurrent.TimeUnit
 import android.widget.ImageButton
-import androidx.appcompat.app.AppCompatDelegate
 
-class LoginActivity : AppCompatActivity() {
+class LoginActivity : BaseActivity() {
 
     private lateinit var emailEditText: EditText
     private lateinit var passwordEditText: EditText
     private lateinit var loginButton: Button
     private lateinit var progressBar: ProgressBar
     private lateinit var preferencesHelper: PreferencesHelper
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
 
     companion object {
         private const val TAG = "LoginActivity"
@@ -44,25 +35,9 @@ class LoginActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        // Theme toggle
         findViewById<ImageButton>(R.id.themeToggleButton).setOnClickListener {
-            val currentMode = AppCompatDelegate.getDefaultNightMode()
-            val newMode = if (currentMode == AppCompatDelegate.MODE_NIGHT_YES) {
-                AppCompatDelegate.MODE_NIGHT_NO
-            } else {
-                AppCompatDelegate.MODE_NIGHT_YES
-            }
-            AppCompatDelegate.setDefaultNightMode(newMode)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startActivity(Intent(this, MainActivity::class.java))
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-            } else {
-                overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-            }
-            recreate()
+            switchThemeWithFade()
         }
-
-
 
         preferencesHelper = PreferencesHelper(this)
 
@@ -75,7 +50,6 @@ class LoginActivity : AppCompatActivity() {
         setupLoginUI()
     }
 
-    // Generate expiry date: 24 hours from now in UTC, ISO 8601 format
     private fun getExpiryDate(): String {
         val calendar = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
         calendar.add(Calendar.HOUR, 24)
@@ -106,7 +80,6 @@ class LoginActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Step 1: Authenticate
                 val authJson = JSONObject().apply {
                     put("email", email)
                     put("password", password)
@@ -117,7 +90,7 @@ class LoginActivity : AppCompatActivity() {
                     .post(authJson.toString().toRequestBody("application/json".toMediaType()))
                     .build()
 
-                val authResponse = client.newCall(authRequest).execute()
+                val authResponse = ApiClient.client.newCall(authRequest).execute()
                 val authBody = authResponse.body?.string()
                 Log.d(TAG, "Auth response code: ${authResponse.code}")
 
@@ -148,19 +121,22 @@ class LoginActivity : AppCompatActivity() {
                     return@launch
                 }
                 val teamId = teamsArray.getJSONObject(0).getString("id")
-                Log.d(TAG, "Team ID: $teamId")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Team ID: $teamId")
+                }
                 preferencesHelper.saveTeamId(teamId)
 
-                // Step 2: Create API key with expiry and state
                 val expiryDate = getExpiryDate()
                 Log.d(TAG, "Expiry date: $expiryDate")
 
                 val apiKeyJson = JSONObject().apply {
                     put("name", "Android_${System.currentTimeMillis()}")
-                    put("expiry", expiryDate)   // ✅ Correct field name (per docs)
-                    put("state", "active")      // ✅ Required field (per docs)
+                    put("expiry", expiryDate)
+                    put("state", "active")
                 }
-                Log.d(TAG, "API key request: $apiKeyJson")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "API key request: $apiKeyJson")
+                }
 
                 val apiKeyRequest = Request.Builder()
                     .url("$MASV_API_BASE/teams/$teamId/api_keys")
@@ -169,10 +145,12 @@ class LoginActivity : AppCompatActivity() {
                     .post(apiKeyJson.toString().toRequestBody("application/json".toMediaType()))
                     .build()
 
-                val apiKeyResponse = client.newCall(apiKeyRequest).execute()
+                val apiKeyResponse = ApiClient.client.newCall(apiKeyRequest).execute()
                 val apiKeyBody = apiKeyResponse.body?.string()
                 Log.d(TAG, "API key response code: ${apiKeyResponse.code}")
-                Log.d(TAG, "API key response body: $apiKeyBody")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "API key response body: $apiKeyBody")
+                }
 
                 if (!apiKeyResponse.isSuccessful || apiKeyBody == null) {
                     withContext(Dispatchers.Main) {
@@ -189,7 +167,9 @@ class LoginActivity : AppCompatActivity() {
                 val apiKeyJsonResponse = JSONObject(apiKeyBody)
                 val apiKey = apiKeyJsonResponse.getString("key")
                 val returnedExpiry = apiKeyJsonResponse.optString("expiry")
-                Log.d(TAG, "API key created: ${apiKey.take(20)}...")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "API key created: ${apiKey.take(20)}...")
+                }
                 Log.d(TAG, "Returned expiry from API: $returnedExpiry")
 
                 preferencesHelper.saveSessionId(apiKey)

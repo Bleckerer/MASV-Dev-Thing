@@ -6,12 +6,12 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.cambrian.masv_dev.api.ApiClient
 import com.cambrian.masv_dev.utils.NotificationHelper
 import com.cambrian.masv_dev.utils.PreferencesHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -19,7 +19,9 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
-import java.util.concurrent.TimeUnit
+import com.cambrian.masv_dev.utils.ProgressRequestBody
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 
 class BatchUploadWorker(
     context: Context,
@@ -30,12 +32,6 @@ class BatchUploadWorker(
         private const val TAG = "BatchUploadWorker"
         private const val MASV_API_BASE = "https://api.massive.app/v1"
     }
-
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.MINUTES)
-        .writeTimeout(5, TimeUnit.MINUTES)
-        .readTimeout(5, TimeUnit.MINUTES)
-        .build()
 
     private fun getApiKey(prefs: PreferencesHelper): String? = prefs.getSessionId()
 
@@ -49,7 +45,9 @@ class BatchUploadWorker(
             notificationHelper.showUploadFailure("Not logged in. Please restart the app and log in.")
             return@withContext Result.failure()
         }
-        Log.d(TAG, "API key retrieved: ${apiKey.take(20)}...")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "API key retrieved: ${apiKey.take(20)}...")
+        }
 
         val teamId = prefs.getTeamId()
         if (teamId.isNullOrEmpty()) {
@@ -57,7 +55,9 @@ class BatchUploadWorker(
             notificationHelper.showUploadFailure("Team ID missing. Please log in again.")
             return@withContext Result.failure()
         }
-        Log.d(TAG, "Team ID: $teamId")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Team ID: $teamId")
+        }
 
         try {
             val batchId = inputData.getString("batchId") ?: run {
@@ -89,9 +89,13 @@ class BatchUploadWorker(
                 packageId = packageInfo.first
                 accessToken = packageInfo.second
                 prefs.saveBatch(batchId, pendingUris, packageId, accessToken)
-                Log.d(TAG, "Package created: $packageId")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Package created: $packageId")
+                }
             } else {
-                Log.d(TAG, "Using existing package: $packageId")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Using existing package: $packageId")
+                }
             }
 
             notificationHelper.showUploadStarted("Batch upload")
@@ -123,8 +127,25 @@ class BatchUploadWorker(
                     break
                 }
 
-                val success = uploadFileMultipart(packageId, accessToken, tempFile, fileName, apiKey)
-                tempFile.delete()
+                var lastPercent = -1
+                val progressCallback: (progress: Long, total: Long) -> Unit = { progress, total ->
+                    val percent = if (total > 0) (progress * 100 / total).toInt() else 0
+                    if (percent != lastPercent) {
+                        lastPercent = percent
+                        notificationHelper.showUploadStarted(fileName, percent)
+                        kotlinx.coroutines.runBlocking {
+                            setProgressAsync(workDataOf(
+                                "currentFile" to currentFileIndex,
+                                "totalFiles" to totalFiles,
+                                "currentFileName" to fileName,
+                                "bytesTransferred" to progress,
+                                "totalBytes" to total
+                            ))
+                        }
+                    }
+                }
+
+                val success = uploadFileMultipart(packageId, accessToken, tempFile, fileName, apiKey, notificationHelper, progressCallback)
 
                 if (success) {
                     succeededUris.add(uriString)
@@ -178,10 +199,7 @@ class BatchUploadWorker(
         }
     }
 
-    // ------------------------------------------------------------------
-    // Helper methods
-    // ------------------------------------------------------------------
-
+    // Helper methods (unchanged, but now using ApiClient.client internally)
     private fun copyUriToTempFile(uri: Uri): File? {
         return try {
             val inputStream = applicationContext.contentResolver.openInputStream(uri) ?: return null
@@ -208,26 +226,32 @@ class BatchUploadWorker(
                 put("recipients", JSONArray().put("jude.bryant@cambriancollege.ca"))
             }
             val url = "$MASV_API_BASE/teams/$teamId/packages"
-            Log.d(TAG, "Creating package at URL: $url")
-            Log.d(TAG, "Request body: $json")
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Creating package at URL: $url")
+                Log.d(TAG, "Request body: $json")
+            }
 
             val request = Request.Builder()
                 .url(url)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("X-API-KEY", apiKey)   // ✅ Correct header
+                .addHeader("X-API-KEY", apiKey)
                 .post(json.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            ApiClient.client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
                 Log.d(TAG, "Create package response code: ${response.code}")
-                Log.d(TAG, "Create package response body: $body")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Create package response body: $body")
+                }
 
                 if (response.isSuccessful && body != null) {
                     val jsonResponse = JSONObject(body)
                     val id = jsonResponse.getString("id")
                     val token = jsonResponse.getString("access_token")
-                    Log.d(TAG, "Package created: $id")
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Package created: $id")
+                    }
                     return Pair(id, token)
                 } else {
                     Log.e(TAG, "Create package failed: ${response.code} - $body")
@@ -247,7 +271,9 @@ class BatchUploadWorker(
         accessToken: String,
         file: File,
         originalFileName: String,
-        apiKey: String
+        apiKey: String,
+        notificationHelper: NotificationHelper,
+        onProgress: (progress: Long, total: Long) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
             val blueprint = requestUploadBlueprint(packageId, accessToken, file, originalFileName, apiKey)
@@ -259,14 +285,14 @@ class BatchUploadWorker(
             val uploadId = initiateMultipartUpload(blueprintUrl, blueprintHeaders) ?: return@withContext false
 
             val fileId = blueprint.getJSONObject("file").getString("id")
-            val partUrls = requestPartUrls(packageId, accessToken, fileId, uploadId, start = 0, count = 1, apiKey)
+            val partUrls = requestPartUrls(packageId, accessToken, fileId, uploadId, apiKey)
             if (partUrls.isEmpty()) return@withContext false
             val part = partUrls[0]
             val partUrl = part.getString("url")
             val partMethod = part.getString("method")
             val partHeaders = part.optJSONObject("headers") ?: JSONObject()
 
-            val eTag = uploadPart(partUrl, partMethod, partHeaders, file) ?: return@withContext false
+            val eTag = uploadPart(partUrl, partMethod, partHeaders, file, onProgress) ?: return@withContext false
 
             finalizeFile(packageId, accessToken, fileId, uploadId, file.length(), eTag, apiKey)
             return@withContext true
@@ -289,17 +315,19 @@ class BatchUploadWorker(
                 put("size", file.length())
             }
             val url = "$MASV_API_BASE/packages/$packageId/files"
-            Log.d(TAG, "Requesting blueprint at: $url")
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Requesting blueprint at: $url")
+            }
 
             val request = Request.Builder()
                 .url(url)
                 .addHeader("X-Package-Token", accessToken)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("X-API-KEY", apiKey)   // ✅ Correct header
+                .addHeader("X-API-KEY", apiKey)
                 .post(json.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            ApiClient.client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
                 Log.d(TAG, "Blueprint response code: ${response.code}")
                 if (response.isSuccessful && body != null) {
@@ -323,13 +351,15 @@ class BatchUploadWorker(
                 requestBuilder.addHeader(key, blueprintHeaders.getString(key))
             }
             val request = requestBuilder.post("".toRequestBody(null)).build()
-            client.newCall(request).execute().use { response ->
+            ApiClient.client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
                 Log.d(TAG, "Initiate upload response code: ${response.code}")
                 if (response.isSuccessful && body != null) {
                     val uploadId = extractUploadIdFromXml(body)
                     if (uploadId != null) {
-                        Log.d(TAG, "Multipart upload initiated, UploadId: $uploadId")
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "Multipart upload initiated, UploadId: $uploadId")
+                        }
                         return uploadId
                     } else {
                         Log.e(TAG, "Failed to extract UploadId from XML: $body")
@@ -354,24 +384,24 @@ class BatchUploadWorker(
         accessToken: String,
         fileId: String,
         uploadId: String,
-        start: Int,
-        count: Int,
         apiKey: String
     ): List<JSONObject> {
         try {
-            val url = "$MASV_API_BASE/packages/$packageId/files/$fileId?start=$start&count=$count"
+            val url = "$MASV_API_BASE/packages/$packageId/files/$fileId?start=0&count=1"
             val json = JSONObject().apply { put("upload_id", uploadId) }
-            Log.d(TAG, "Requesting part URLs at: $url")
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Requesting part URLs at: $url")
+            }
 
             val request = Request.Builder()
                 .url(url)
                 .addHeader("X-Package-Token", accessToken)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("X-API-KEY", apiKey)   // ✅ Correct header
+                .addHeader("X-API-KEY", apiKey)
                 .post(json.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            ApiClient.client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
                 Log.d(TAG, "Part URLs response code: ${response.code}")
                 if (response.isSuccessful && body != null) {
@@ -393,25 +423,38 @@ class BatchUploadWorker(
         return emptyList()
     }
 
-    private fun uploadPart(partUrl: String, method: String, headers: JSONObject, file: File): String? {
+    private fun uploadPart(
+        partUrl: String,
+        method: String,
+        headers: JSONObject,
+        file: File,
+        onProgress: (progress: Long, total: Long) -> Unit
+    ): String? {
         try {
             val requestBuilder = Request.Builder().url(partUrl)
             headers.keys().forEach { key ->
                 requestBuilder.addHeader(key, headers.getString(key))
             }
-            val body = file.asRequestBody("application/octet-stream".toMediaType())
+
+            // Wrap the request body with ProgressRequestBody
+            val originalBody = file.asRequestBody("application/octet-stream".toMediaType())
+            val progressBody = ProgressRequestBody(originalBody, onProgress)
+
             val request = when (method.uppercase()) {
-                "PUT" -> requestBuilder.put(body).build()
-                "POST" -> requestBuilder.post(body).build()
+                "PUT" -> requestBuilder.put(progressBody).build()
+                "POST" -> requestBuilder.post(progressBody).build()
                 else -> {
                     Log.e(TAG, "Unsupported upload method: $method")
                     return null
                 }
             }
-            client.newCall(request).execute().use { response ->
+
+            ApiClient.client.newCall(request).execute().use { response ->
                 if (response.isSuccessful) {
                     val eTag = response.header("ETag")?.trim('"')
-                    Log.d(TAG, "Part uploaded, ETag: $eTag")
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Part uploaded, ETag: $eTag")
+                    }
                     return eTag
                 } else {
                     Log.e(TAG, "Part upload failed: ${response.code} - ${response.body?.string()}")
@@ -444,17 +487,19 @@ class BatchUploadWorker(
                 })
             }
             val url = "$MASV_API_BASE/packages/$packageId/files/$fileId/finalize"
-            Log.d(TAG, "Finalizing file at: $url")
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Finalizing file at: $url")
+            }
 
             val request = Request.Builder()
                 .url(url)
                 .addHeader("X-Package-Token", accessToken)
                 .addHeader("Content-Type", "application/json")
-                .addHeader("X-API-KEY", apiKey)   // ✅ Correct header
+                .addHeader("X-API-KEY", apiKey)
                 .post(json.toString().toRequestBody("application/json".toMediaType()))
                 .build()
 
-            client.newCall(request).execute().use { response ->
+            ApiClient.client.newCall(request).execute().use { response ->
                 Log.d(TAG, "File finalize response: ${response.code}")
                 if (response.code == 401) handleSessionExpired()
             }
@@ -471,34 +516,42 @@ class BatchUploadWorker(
         )
         for (endpoint in endpoints) {
             try {
-                Log.d(TAG, "Attempting to close package at: $endpoint")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Attempting to close package at: $endpoint")
+                }
                 val request = if (endpoint == "$MASV_API_BASE/packages/$packageId") {
                     val json = JSONObject().apply { put("state", "closed") }
                     Request.Builder()
                         .url(endpoint)
                         .addHeader("X-Package-Token", accessToken)
                         .addHeader("Content-Type", "application/json")
-                        .addHeader("X-API-KEY", apiKey)   // ✅ Correct header
+                        .addHeader("X-API-KEY", apiKey)
                         .patch(json.toString().toRequestBody("application/json".toMediaType()))
                         .build()
                 } else {
                     Request.Builder()
                         .url(endpoint)
                         .addHeader("X-Package-Token", accessToken)
-                        .addHeader("X-API-KEY", apiKey)   // ✅ Correct header
+                        .addHeader("X-API-KEY", apiKey)
                         .post("".toRequestBody(null))
                         .build()
                 }
-                client.newCall(request).execute().use { response ->
-                    Log.d(TAG, "Close attempt on $endpoint: ${response.code}")
+                ApiClient.client.newCall(request).execute().use { response ->
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Close attempt on $endpoint: ${response.code}")
+                    }
                     if (response.isSuccessful) {
-                        Log.d(TAG, "Package closed successfully via $endpoint")
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "Package closed successfully via $endpoint")
+                        }
                         return
                     }
                     if (response.code == 401) handleSessionExpired()
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Close attempt on $endpoint failed", e)
+                if (BuildConfig.DEBUG) {
+                    Log.w(TAG, "Close attempt on $endpoint failed", e)
+                }
             }
         }
         Log.w(TAG, "Could not close package, but files were uploaded. You may need to close manually in MASV portal.")
