@@ -1,8 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
       xmlns:app="http://schemas.android.com/apk/res-auto">
+
     <item
             android:id="@+id/action_settings"
-            android:title="Settings"
-            app:showAsAction="never" />   <!-- This will always appear in the three‑dots overflow -->
+            android:title="@string/settings_menu"
+            android:icon="@drawable/ic_settings"
+            app:showAsAction="ifRoom" />
+
+    <item
+            android:id="@+id/action_history"
+            android:title="History"
+            android:icon="@drawable/ic_history"
+            app:showAsAction="ifRoom" />
+
 </menu>

@@ -12,6 +12,8 @@
     <color name="button_destructive">#E62323</color>
     <color name="button_destructive_text">#E62323</color>
     <color name="button_text">#FFFFFF</color>
+    <color name="button_text_primary">#FFFFFF</color>
+
 
     <!-- Backgrounds -->
     <color name="background">#FFFFFF</color>
@@ -35,4 +37,6 @@
 
     <!-- Icons -->
     <color name="icon_tint">#1F2937</color>
+    <color name="status_bg">#E0E0E0</color>
+    <color name="accent">#1976D2</color>
 </resources>

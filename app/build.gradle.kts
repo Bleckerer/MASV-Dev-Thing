@@ -4,6 +4,7 @@ import java.io.File
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+    id("com.google.devtools.ksp") version "2.0.21-1.0.28"
 }
 
 val secretsFile = File(rootDir, "secrets.properties")
@@ -25,7 +26,8 @@ android {
         buildConfigField("String", "MASV_PROXY_URL", "\"$proxyUrl\"")
     }
 
-    buildFeatures { buildConfig = true }
+    buildFeatures { buildConfig = true
+                    viewBinding = true}
 
     buildTypes {
         release {
@@ -57,4 +59,9 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.cardview:cardview:1.0.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Room
+    implementation("androidx.room:room-runtime:2.7.0")
+    implementation("androidx.room:room-ktx:2.7.0")
+    ksp("androidx.room:room-compiler:2.7.0")
 }

@@ -1,10 +1,89 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- App name -->
     <string name="app_name">MASV-Dev</string>
-    <string name="sign_in_with_your_masv_account">Sign in with your MASV account</string>
-    <string name="masv_email">MASV Email</string>
-    <string name="placeholder">••••••••••</string>
-    <string name="masv_password">MASV Password</string>
-    <string name="button">Log in</string>
-    <string name="masv_logo">MASV Logo</string>
+
+    <!-- Login / Theme -->
+    <string name="logo_description">MASV Logo</string>
+    <string name="toggle_theme_description">Toggle theme</string>
+    <string name="settings_description">Settings</string>
+
+    <!-- Dialog Settings -->
+    <string name="scan_interval_label">Scan interval (minutes)</string>
+    <string name="upload_retry_label">Upload retry interval (minutes)</string>
+    <string name="extensions_label">Extensions</string>
+    <string name="extension_hint">e.g., jpg</string>
+    <string name="add_button">Add</string>
+    <string name="logout_button">Logout</string>
+    <string name="cancel_button">Cancel</string>
+    <string name="save_button">Save</string>
+
+    <!-- MainActivity UI -->
+    <string name="no_folder_selected">No folder selected</string>
+    <string name="no_folder_selected_detected">Detected files: (no folder selected)</string>
+    <string name="unable_to_access_folder">Detected files: (unable to access folder)</string>
+    <string name="error_detected_files">Detected files: error</string>
+    <string name="detected_files_in_folder">Detected files in folder: %d</string>
+    <string name="pending_uploads_with_count">Pending uploads: %d</string>
+    <string name="never">Never</string>
+    <string name="last_upload_with_time">Last upload: %s</string>
+    <string name="monitoring_prefix">Monitoring: %s</string>
+    <string name="monitoring_active">Monitoring Active</string>
+    <string name="monitoring_started">Monitoring started! Will check for new files every %d minutes.</string>
+    <string name="please_select_folder_first">Please select a folder first</string>
+    <string name="folder_selected">Folder selected: %s</string>
+
+    <!-- Buttons / Actions -->
+    <string name="select_folder_button">Select Folder</string>
+    <string name="start_monitoring_button">Start Monitoring</string>
+    <string name="manual_scan_button">Manual Scan</string>
+    <string name="manual_upload_button">Manual Upload</string>
+    <string name="reset_history_button">Reset Upload History</string>
+    <string name="reset_upload_history">Reset Upload History</string>
+    <string name="reset_history_message">This will allow previously uploaded files to be uploaded again. Continue?</string>
+    <string name="reset_button">Reset</string>
+    <string name="upload_history_cleared">Upload history cleared</string>
+    <string name="scanning_for_new_files">Scanning for new files... (no upload)</string>
+    <string name="manual_scan_started">Manual scan started. New files will be uploaded.</string>
+
+    <!-- Upload Progress -->
+    <string name="uploading_file_x_of_y">Uploading file %1$d of %2$d</string>
+    <string name="file_prefix">File: %s</string>
+    <string name="preparing_upload">Preparing upload...</string>
+    <string name="upload_paused_retrying">Upload paused – retrying</string>
+    <string name="waiting_for_next_attempt">Waiting for next attempt</string>
+    <string name="finalising_package">Finalising package...</string>
+    <string name="upload_complete">Upload complete</string>
+
+    <!-- Storage Permission -->
+    <string name="storage_permission_title">Storage Permission Required</string>
+    <string name="storage_permission_message">This app needs access to manage all files to monitor the folder.\n\nTap \'Open Settings\' and enable \'All files access\' for this app.</string>
+    <string name="open_settings">Open Settings</string>
+
+    <!-- Logout / Session -->
+    <string name="logout_title">Logout</string>
+    <string name="logout_message">Are you sure you want to logout?</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+    <string name="session_expired">Session expired. Please log in again.</string>
+
+    <!-- Settings Dialog -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_menu">Settings</string>
+    <string name="scan_interval_too_low">Scan interval must be >= 15</string>
+    <string name="upload_retry_too_low">Upload retry interval must be >= 5</string>
+
+    <!-- Permission -->
+    <string name="permission_granted">Permissions granted</string>
+    <string name="some_permissions_denied">Some permissions denied. Functionality may be limited.</string>
+
+    <string name="view_upload_history">View Upload History</string>
+    <!-- Replace the old manual scan label -->
+    <string name="select_files_button">Select Files</string>
+
+    <!-- New feedback toast -->
+    <string name="files_added_to_queue">%d file(s) added to queue. Press Manual Upload to start.</string>
+    <string name="uploading_pending_batch">Uploading queued files...</string>
+    <string name="packages_title">MASV Packages</string>
+    <string name="load_packages_failed">Failed to load packages</string>
+
 </resources>

@@ -60,7 +60,8 @@ class FileMonitorWorker(
                     // Always create a fresh batch ID – no persistence across scans
                     val batchId = System.currentTimeMillis().toString()
                     val uriStrings = newlyFoundUris.map { it.toString() }.toSet()
-                    prefs.saveBatch(batchId, uriStrings, "", "")  // empty package id / token for now
+                    prefs.saveBatch(batchId, uriStrings, "", "")
+                    prefs.saveCurrentBatchId(batchId)
                     val inputData = workDataOf("batchId" to batchId)
                     val batchWork = OneTimeWorkRequestBuilder<BatchUploadWorker>()
                         .setInputData(inputData)

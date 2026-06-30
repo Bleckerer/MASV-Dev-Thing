@@ -61,11 +61,18 @@ class NotificationHelper(private val context: Context) {
         manager.notify(NOTIFICATION_ID_NEW_FILES, notification)
     }
 
-    fun showUploadStarted(fileName: String, progress: Int = 0) {
+    fun showUploadStarted(fileName: String, progress: Int = 0, speed: Double = 0.0, etaSeconds: Long? = null) {
+        var text = "Uploading: $fileName ($progress%)"
+        if (speed > 0) {
+            text += " · ${String.format("%.1f", speed)} MB/s"
+        }
+        if (etaSeconds != null && etaSeconds > 0) {
+            text += " · ~${formatEta(etaSeconds)}"
+        }
         val notification = NotificationCompat.Builder(context, CHANNEL_ID_STATUS)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
             .setContentTitle("Uploading to MASV")
-            .setContentText("Uploading: $fileName ($progress%)")
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
             .setProgress(100, progress, false)
@@ -73,6 +80,14 @@ class NotificationHelper(private val context: Context) {
 
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.notify(NOTIFICATION_ID_UPLOAD_START, notification)
+    }
+
+    private fun formatEta(seconds: Long): String {
+        return when {
+            seconds < 60 -> "${seconds}s"
+            seconds < 3600 -> "${seconds / 60}m ${seconds % 60}s"
+            else -> "${seconds / 3600}h ${(seconds % 3600) / 60}m"
+        }
     }
 
     fun showWaitingForNetwork() {

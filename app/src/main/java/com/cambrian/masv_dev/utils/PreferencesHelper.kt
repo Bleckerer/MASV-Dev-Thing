@@ -1,39 +1,67 @@
 package com.cambrian.masv_dev.utils
 
 import android.content.Context
+import android.content.SharedPreferences
+import android.security.keystore.KeyPermanentlyInvalidatedException
+import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
+import javax.crypto.AEADBadTagException
 
 class PreferencesHelper(context: Context) {
 
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    private val prefs: SharedPreferences = createEncryptedPreferences(context)
 
-    private val prefs = EncryptedSharedPreferences.create(
-        context,
-        "masv_dev_prefs_encrypted",
-        masterKey,
-        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
-    )
+    private fun createEncryptedPreferences(context: Context): SharedPreferences {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        return try {
+            EncryptedSharedPreferences.create(
+                context,
+                "masv_dev_prefs_encrypted",
+                masterKey,
+                EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+            )
+        } catch (e: Exception) {
+            when (e) {
+                is AEADBadTagException,
+                is KeyPermanentlyInvalidatedException,
+                is javax.crypto.BadPaddingException -> {
+                    // Clear the corrupt file
+                    context.getSharedPreferences("masv_dev_prefs_encrypted", Context.MODE_PRIVATE)
+                        .edit().clear().apply()
+                    // Retry
+                    EncryptedSharedPreferences.create(
+                        context,
+                        "masv_dev_prefs_encrypted",
+                        masterKey,
+                        EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+                        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+                    )
+                }
+                else -> throw e
+            }
+        }
+    }
 
     // -------------------- Folder monitoring --------------------
     fun saveMonitoredFolderUri(uri: String) {
-        prefs.edit().putString("monitored_folder_uri", uri).apply()
+        prefs.edit { putString("monitored_folder_uri", uri) }
     }
 
     fun getMonitoredFolderUri(): String? = prefs.getString("monitored_folder_uri", null)
 
     fun saveMonitoredFolderPath(path: String) {
-        prefs.edit().putString("monitored_folder_path", path).apply()
+        prefs.edit { putString("monitored_folder_path", path) }
     }
 
     fun getMonitoredFolderPath(): String? = prefs.getString("monitored_folder_path", null)
 
     // -------------------- Uploaded files --------------------
     fun saveUploadedFiles(files: Set<String>) {
-        prefs.edit().putString("uploaded_files", files.joinToString(",")).apply()
+        prefs.edit { putString("uploaded_files", files.joinToString(",")) }
     }
 
     fun getUploadedFiles(): Set<String> {
@@ -42,7 +70,7 @@ class PreferencesHelper(context: Context) {
     }
 
     fun saveLastUploadTime(timestamp: Long) {
-        prefs.edit().putLong("last_upload_time", timestamp).apply()
+        prefs.edit { putLong("last_upload_time", timestamp) }
     }
 
     fun getLastUploadTime(): String? {
@@ -53,26 +81,36 @@ class PreferencesHelper(context: Context) {
         } else null
     }
 
+    // -------------------- Current batch ID --------------------
+    fun saveCurrentBatchId(batchId: String) {
+        prefs.edit { putString("current_batch_id", batchId) }
+    }
+
+    fun getCurrentBatchId(): String? = prefs.getString("current_batch_id", null)
+
+    fun clearCurrentBatchId() {
+        prefs.edit { remove("current_batch_id") }
+    }
+
     // -------------------- Intervals --------------------
     fun saveScanIntervalMinutes(minutes: Int) {
-        prefs.edit().putInt("scan_interval_minutes", minutes).apply()
+        prefs.edit { putInt("scan_interval_minutes", minutes) }
     }
 
     fun getScanIntervalMinutes(): Int = prefs.getInt("scan_interval_minutes", 15)
 
     fun saveUploadRetryIntervalMinutes(minutes: Int) {
-        prefs.edit().putInt("upload_retry_interval_minutes", minutes).apply()
+        prefs.edit { putInt("upload_retry_interval_minutes", minutes) }
     }
 
     fun getUploadRetryIntervalMinutes(): Int = prefs.getInt("upload_retry_interval_minutes", 30)
 
     // -------------------- Batch storage --------------------
     fun saveBatch(batchId: String, uris: Set<String>, packageId: String, accessToken: String) {
-        with(prefs.edit()) {
+        prefs.edit {
             putStringSet("batch_${batchId}_uris", uris)
             putString("batch_${batchId}_package_id", packageId)
             putString("batch_${batchId}_access_token", accessToken)
-            apply()
         }
     }
 
@@ -81,38 +119,37 @@ class PreferencesHelper(context: Context) {
     fun getBatchAccessToken(batchId: String): String? = prefs.getString("batch_${batchId}_access_token", null)
 
     fun removeBatch(batchId: String) {
-        with(prefs.edit()) {
+        prefs.edit {
             remove("batch_${batchId}_uris")
             remove("batch_${batchId}_package_id")
             remove("batch_${batchId}_access_token")
-            apply()
+        }
+        // If this is the current batch, clear it
+        if (getCurrentBatchId() == batchId) {
+            clearCurrentBatchId()
         }
     }
 
     // -------------------- Session --------------------
     fun saveSessionId(sessionId: String) {
-        prefs.edit().putString("session_id", sessionId).apply()
+        prefs.edit { putString("session_id", sessionId) }
     }
 
     fun getSessionId(): String? = prefs.getString("session_id", null)
 
     fun clearSession() {
-        prefs.edit().remove("session_id").remove("team_id").apply()
+        prefs.edit {
+            remove("session_id")
+            remove("team_id")
+        }
     }
 
     // -------------------- Team ID --------------------
     fun saveTeamId(teamId: String) {
-        prefs.edit().putString("team_id", teamId).apply()
+        prefs.edit { putString("team_id", teamId) }
     }
 
     fun getTeamId(): String? = prefs.getString("team_id", null)
-
-    // -------------------- Proxy URL (kept for compatibility) --------------------
-    fun saveProxyUrl(url: String) {
-        prefs.edit().putString("proxy_url", url).apply()
-    }
-
-    fun getProxyUrl(): String? = prefs.getString("proxy_url", null)
 
     // -------------------- File extensions --------------------
     fun getScanExtensions(): String {
@@ -132,20 +169,14 @@ class PreferencesHelper(context: Context) {
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() && it != "." }
             .joinToString(",")
-        prefs.edit().putString("scan_extensions", cleaned).apply()
+        prefs.edit { putString("scan_extensions", cleaned) }
     }
 
     fun addFileExtension(ext: String) {
         val current = getScanExtensionsSet()
         var normalized = ext.trim().lowercase()
-
-        // Remove any dangerous characters (path separators, semicolon, pipes, etc.)
         normalized = normalized.replace(Regex("[^a-z0-9.]"), "")
-
-        if (normalized.isEmpty() || normalized == ".") {
-            return
-        }
-
+        if (normalized.isEmpty() || normalized == ".") return
         if (!normalized.startsWith(".")) normalized = ".$normalized"
         current.add(normalized)
         saveScanExtensions(current.joinToString(","))

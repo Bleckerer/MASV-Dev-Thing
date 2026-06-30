@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+                                   xmlns:app="http://schemas.android.com/apk/res-auto"
+                                   android:layout_width="match_parent"
+                                   android:layout_height="wrap_content"
+                                   android:layout_marginBottom="8dp"
+                                   app:cardCornerRadius="8dp"
+                                   app:cardElevation="2dp"
+                                   app:cardBackgroundColor="@color/card_bg">
+
+    <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+        <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+            <TextView
+                    android:id="@+id/fileNameText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="file.dat"
+                    android:textSize="16sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-medium" />
+
+            <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="PENDING"
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:padding="4dp"
+                    android:background="@drawable/status_badge" />
+        </LinearLayout>
+
+        <TextView
+                android:id="@+id/fileSizeText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="1.2 MB"
+                android:textSize="12sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginTop="4dp" />
+
+        <ProgressBar
+                android:id="@+id/progressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_marginTop="8dp"
+                android:progress="0"
+                android:max="100"
+                android:progressTint="@color/accent" />
+
+        <TextView
+                android:id="@+id/timestampText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="2025-01-01 12:00"
+                android:textSize="11sp"
+                android:textColor="@color/text_hint"
+                android:layout_marginTop="4dp" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>

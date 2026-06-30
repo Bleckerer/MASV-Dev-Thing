@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="wrap_content"
+              android:orientation="horizontal"
+              android:paddingStart="16dp"
+              android:paddingEnd="16dp"
+              android:paddingTop="8dp"
+              android:paddingBottom="8dp"
+              android:background="@color/background"
+              android:gravity="center_vertical">
+
+    <TextView
+            android:id="@+id/fileNameText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="file.dat"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:fontFamily="sans-serif" />
+
+    <TextView
+            android:id="@+id/fileSizeText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 B"
+            android:textSize="12sp"
+            android:textColor="@color/text_hint"
+            android:layout_marginEnd="12dp" />
+
+    <TextView
+            android:id="@+id/fileStateText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="11sp"
+            android:textColor="@color/text_hint"
+            android:padding="2dp" />
+
+</LinearLayout>

@@ -6,10 +6,16 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import com.cambrian.masv_dev.api.ApiClient
+import com.cambrian.masv_dev.ApiClient
+import com.cambrian.masv_dev.data.UploadDatabase
+import com.cambrian.masv_dev.data.UploadEntity
+import com.cambrian.masv_dev.data.UploadStatus
 import com.cambrian.masv_dev.utils.NotificationHelper
 import com.cambrian.masv_dev.utils.PreferencesHelper
+import com.cambrian.masv_dev.utils.ProgressRequestBody
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
@@ -19,9 +25,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
-import com.cambrian.masv_dev.utils.ProgressRequestBody
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.launch
+import java.util.concurrent.TimeUnit
 
 class BatchUploadWorker(
     context: Context,
@@ -38,6 +42,7 @@ class BatchUploadWorker(
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val prefs = PreferencesHelper(applicationContext)
         val notificationHelper = NotificationHelper(applicationContext)
+        val uploadDao = UploadDatabase.getInstance(applicationContext).uploadDao()
 
         val apiKey = getApiKey(prefs)
         if (apiKey.isNullOrEmpty()) {
@@ -76,6 +81,24 @@ class BatchUploadWorker(
                 return@withContext Result.success()
             }
 
+            // Insert all files into database as PENDING
+            val fileNames = pendingUris.map { uriString ->
+                val uri = Uri.parse(uriString)
+                getFileNameFromUri(uri) ?: "unknown"
+            }
+            val pendingEntities = pendingUris.zip(fileNames).map { (uri, name) ->
+                UploadEntity(
+                    fileName = name,
+                    fileSize = getFileSizeFromUri(Uri.parse(uri)) ?: 0L,
+                    uri = uri,
+                    batchId = batchId,
+                    status = UploadStatus.PENDING,
+                    progressPercent = 0,
+                    timestamp = System.currentTimeMillis()
+                )
+            }
+            uploadDao.insertAll(pendingEntities)
+
             var packageId = prefs.getBatchPackageId(batchId)
             var accessToken = prefs.getBatchAccessToken(batchId)
 
@@ -84,6 +107,9 @@ class BatchUploadWorker(
                 val packageInfo = createMasvPackage(apiKey, teamId) ?: run {
                     Log.e(TAG, "Failed to create package for batch $batchId")
                     notificationHelper.showUploadFailure("Failed to create upload package")
+                    pendingUris.forEach { uri ->
+                        uploadDao.updateStatusAndError(uri, batchId, UploadStatus.FAILED, "Package creation failed")
+                    }
                     return@withContext Result.failure()
                 }
                 packageId = packageInfo.first
@@ -107,10 +133,20 @@ class BatchUploadWorker(
 
             setProgressAsync(workDataOf("currentFile" to 0, "totalFiles" to totalFiles, "currentFileName" to ""))
 
+            var currentFileUri: String? = null
+
             for (uriString in pendingUris) {
                 currentFileIndex++
                 val uri = Uri.parse(uriString)
                 val fileName = getFileNameFromUri(uri) ?: "unknown"
+
+                var lastTime = System.currentTimeMillis()
+                var lastBytes = 0L
+                var speedBytesPerSecond = 0.0
+
+                currentFileUri = uriString
+
+                uploadDao.updateProgressAndStatus(uriString, batchId, 0, UploadStatus.UPLOADING)
 
                 setProgressAsync(workDataOf(
                     "currentFile" to currentFileIndex,
@@ -121,6 +157,7 @@ class BatchUploadWorker(
                 val tempFile = copyUriToTempFile(uri)
                 if (tempFile == null) {
                     Log.e(TAG, "Failed to copy $fileName")
+                    uploadDao.updateStatusAndError(uriString, batchId, UploadStatus.FAILED, "Failed to copy file")
                     notificationHelper.cancelUploadStarted()
                     notificationHelper.showUploadFailure("Failed to access $fileName")
                     allSuccess = false
@@ -130,35 +167,64 @@ class BatchUploadWorker(
                 var lastPercent = -1
                 val progressCallback: (progress: Long, total: Long) -> Unit = { progress, total ->
                     val percent = if (total > 0) (progress * 100 / total).toInt() else 0
+                    val currentTime = System.currentTimeMillis()
+                    val timeDelta = (currentTime - lastTime) / 1000.0 // seconds
+                    if (timeDelta > 0) {
+                        val bytesDelta = progress - lastBytes
+                        speedBytesPerSecond = bytesDelta / timeDelta
+                    }
+                    lastTime = currentTime
+                    lastBytes = progress
+
+                    val speedMB = speedBytesPerSecond / (1024 * 1024)
+                    val etaSeconds = if (speedBytesPerSecond > 0) ((total - progress) / speedBytesPerSecond).toLong() else null
                     if (percent != lastPercent) {
                         lastPercent = percent
-                        notificationHelper.showUploadStarted(fileName, percent)
-                        kotlinx.coroutines.runBlocking {
+                        notificationHelper.showUploadStarted(fileName, percent, speedMB, etaSeconds)
+
+                        runBlocking {
+                            uploadDao.updateProgressAndStatus(uriString, batchId, percent, UploadStatus.UPLOADING)
                             setProgressAsync(workDataOf(
                                 "currentFile" to currentFileIndex,
                                 "totalFiles" to totalFiles,
                                 "currentFileName" to fileName,
                                 "bytesTransferred" to progress,
-                                "totalBytes" to total
+                                "totalBytes" to total,
+                                "speed" to speedMB,
+                                "eta" to (etaSeconds ?: 0L)
                             ))
                         }
                     }
                 }
 
-                val success = uploadFileMultipart(packageId, accessToken, tempFile, fileName, apiKey, notificationHelper, progressCallback)
+                try {
+                    val success = uploadFileMultipart(packageId, accessToken, tempFile, fileName, apiKey, progressCallback)
+                    tempFile.delete()
 
-                if (success) {
-                    succeededUris.add(uriString)
-                    val uploaded = prefs.getUploadedFiles().toMutableSet()
-                    uploaded.add(uriString)
-                    prefs.saveUploadedFiles(uploaded)
-                    Log.d(TAG, "Uploaded: $fileName")
-                } else {
-                    allSuccess = false
-                    Log.e(TAG, "Failed to upload: $fileName")
+                    if (success) {
+                        succeededUris.add(uriString)
+                        val uploaded = prefs.getUploadedFiles().toMutableSet()
+                        uploaded.add(uriString)
+                        prefs.saveUploadedFiles(uploaded)
+                        uploadDao.updateStatusAndError(uriString, batchId, UploadStatus.COMPLETED)
+                        Log.d(TAG, "Uploaded: $fileName")
+                    } else {
+                        allSuccess = false
+                        Log.e(TAG, "Failed to upload: $fileName")
+                        uploadDao.updateStatusAndError(uriString, batchId, UploadStatus.FAILED, "Upload failed")
+                        notificationHelper.cancelUploadStarted()
+                        notificationHelper.showUploadFailure("Failed to upload $fileName")
+                        break
+                    }
+                } catch (e: java.util.concurrent.CancellationException) {
+                    Log.w(TAG, "Upload cancelled by user")
+                    currentFileUri?.let { uri ->
+                        uploadDao.updateStatusAndError(uri, batchId, UploadStatus.FAILED, "Cancelled by user")
+                    }
                     notificationHelper.cancelUploadStarted()
-                    notificationHelper.showUploadFailure("Failed to upload $fileName")
-                    break
+                    notificationHelper.showUploadFailure("Upload cancelled by user")
+                    // DO NOT remove the batch – keep it for retry
+                    return@withContext Result.failure()
                 }
             }
 
@@ -199,7 +265,20 @@ class BatchUploadWorker(
         }
     }
 
-    // Helper methods (unchanged, but now using ApiClient.client internally)
+    // ------------------------------------------------------------------
+    // Helper methods
+    // ------------------------------------------------------------------
+
+    private fun getFileSizeFromUri(uri: Uri): Long? {
+        return try {
+            applicationContext.contentResolver.openFileDescriptor(uri, "r")?.use { fd ->
+                fd.statSize
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
     private fun copyUriToTempFile(uri: Uri): File? {
         return try {
             val inputStream = applicationContext.contentResolver.openInputStream(uri) ?: return null
@@ -272,7 +351,6 @@ class BatchUploadWorker(
         file: File,
         originalFileName: String,
         apiKey: String,
-        notificationHelper: NotificationHelper,
         onProgress: (progress: Long, total: Long) -> Unit
     ): Boolean = withContext(Dispatchers.IO) {
         try {
@@ -436,7 +514,6 @@ class BatchUploadWorker(
                 requestBuilder.addHeader(key, headers.getString(key))
             }
 
-            // Wrap the request body with ProgressRequestBody
             val originalBody = file.asRequestBody("application/octet-stream".toMediaType())
             val progressBody = ProgressRequestBody(originalBody, onProgress)
 
